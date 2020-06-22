@@ -1,0 +1,173 @@
+---
+title: 'Reproducible Research: Peer Assessment 2'
+output:
+  pdf_document: default
+  html_document:
+    keep_md: yes
+  word_document: default
+---
+# Health/Economic Consequences in U.S. caused by Storms ans Weather Events
+
+
+
+# 1 - Introduction
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+This Data Science Project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+# 2 - Synopsis
+This report address questions related to Weather Events and Storms in U.S. that are most damaging in terms of Fatalities, Injuries and damages to properties and crop.
+
+The two questions to be answered are:
+
+1.Which types of events are most harmful with respect to population health?
+
+2.Which types of events have the greatest economic consequences?
+
+## Loading required libraries
+
+```{r, echo=TRUE}
+getwd()
+library("knitr")
+library(RColorBrewer)
+opts_chunk$set(echo = TRUE )
+opts_chunk$set(cache = TRUE )
+opts_chunk$set(out.width='1000px', dpi=200)
+```
+# 3 - Data Processing
+
+## Loading NOAA data into R
+
+```{r, echo=TRUE,cache=TRUE}
+## Copy LinkLoaction for "Storm Data" and Download CSV File
+if(!file.exists("./repdata_data_StormData.csv.bz2")){
+    file.create("./repdata_data_StormData.csv.bz2")
+    download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2",
+                  "./repdata_data_StormData.csv.bz2")
+}
+## Read data as data frame
+storm<-read.csv("./repdata_data_StormData.csv.bz2", header=T)
+## backing up the original data and the data has to modified
+stormunchanged<-storm
+summary(storm)
+```
+Defining variables that will be used:
+
+- EVTYPE: Event Type (Tornados, Flood, ....)
+
+- FATALITIES: Number of Fatalities
+
+- INJURIES: Number of Injuries
+
+- PROGDMG: Property Damage
+
+- PROPDMGEXP: Units for Property Damage (magnitudes - K,B,M)
+
+- CROPDMG: Crop Damage
+
+- CROPDMGEXP: Units for Crop Damage (magnitudes - K,BM,B)
+
+e) Unknown symbols in PROPDMGEXP and CROPDMGEXP can be equated to 0.
+
+```{r}
+## Data Conversion: Factor data to character
+storm$PROPDMGEXP<-as.character(storm$PROPDMGEXP)
+storm$CROPDMGEXP<-as.character(storm$CROPDMGEXP)
+## Property and crop damage units and respective column numbers
+propcol<-grep("PROPDMGEXP",colnames(storm))
+cropcol<-grep("CROPDMGEXP",colnames(storm))
+storm[storm$PROPDMGEXP=="",propcol]<-"0"
+storm[storm$PROPDMGEXP=="-",propcol]<-"0"
+storm[storm$PROPDMGEXP=="?",propcol]<-"0"
+storm[storm$PROPDMGEXP=="+",propcol]<-"0"
+storm[storm$PROPDMGEXP=="1",propcol]<-"0"
+storm[storm$PROPDMGEXP=="2",propcol]<-"0"
+storm[storm$PROPDMGEXP=="3",propcol]<-"0"
+storm[storm$PROPDMGEXP=="4",propcol]<-"0"
+storm[storm$PROPDMGEXP=="5",propcol]<-"0"
+storm[storm$PROPDMGEXP=="6",propcol]<-"0"
+storm[storm$PROPDMGEXP=="7",propcol]<-"0"
+storm[storm$PROPDMGEXP=="8",propcol]<-"0"
+storm[storm$PROPDMGEXP=="h",propcol]<-"100"
+storm[storm$PROPDMGEXP=="H",propcol]<-"100"
+storm[storm$PROPDMGEXP=="K",propcol]<-"1000"
+storm[storm$PROPDMGEXP=="m",propcol]<-"1000000"
+storm[storm$PROPDMGEXP=="M",propcol]<-"1000000"
+storm[storm$PROPDMGEXP=="B",propcol]<-"1000000000"
+storm[storm$CROPDMGEXP=="",cropcol]<-"0"
+storm[storm$CROPDMGEXP=="?",cropcol]<-"0"
+storm[storm$CROPDMGEXP=="2",cropcol]<-"0"
+storm[storm$CROPDMGEXP=="k",cropcol]<-"1000"
+storm[storm$CROPDMGEXP=="K",cropcol]<-"1000"
+storm[storm$CROPDMGEXP=="m",cropcol]<-"1000000"
+storm[storm$CROPDMGEXP=="M",cropcol]<-"1000000"
+storm[storm$CROPDMGEXP=="B",cropcol]<-"1000000000"
+##Data Convertion: Property and crop damage units to numeric
+storm$PROPDMGEXP<-as.numeric(storm$PROPDMGEXP)
+storm$CROPDMGEXP<-as.numeric(storm$CROPDMGEXP)
+## multiplying the unit and cost to get the cost in same unit
+storm$PROPDMG<-storm$PROPDMG*storm$PROPDMGEXP
+storm$CROPDMG<-storm$CROPDMG*storm$CROPDMGEXP
+```
+ 
+###subsetting the data for our analysis
+```{r}
+storm.h <- subset(storm, select = c(EVTYPE,FATALITIES,INJURIES ))
+storm.e <- subset(storm, select = c(EVTYPE,PROPDMG,CROPDMG))
+```
+
+##Summarize Data
+```{r}
+##Summarizing the fatalities and injuries
+fatalities<- tapply(storm.h$FATALITIES, storm.h$EVTYPE, sum)
+fatalitiestop10  <- sort(fatalities,decreasing = TRUE)[1:10]
+injuries    <- tapply(storm.h$INJURIES, storm.h$EVTYPE, sum)
+injuriestop10  <- sort(injuries,decreasing = T)[1:10]
+##summarizing the property and crop damage
+propdmg   <- tapply(storm.e$PROPDMG,  storm.e$EVTYPE, sum)
+propdmgtop10 <- sort(propdmg,decreasing = T)[1:10]
+cropdmg   <- tapply(storm.e$CROPDMG,  storm.e$EVTYPE, sum)
+cropdmgtop10 <-sort(cropdmg,decreasing = T)[1:10]
+```
+
+##Plot Data
+```{r}
+##plotting the Ten most severe types of weather events in terms of human health impacts
+par(mfrow = c(1,2 ),mar=c(2,5,2,2), oma = c(3,1,3,1))
+  barplot(fatalitiestop10, names.arg=names(fatalitiestop10), cex.names=0.5, las=3, col = heat.colors(10), 
+        space=0.1,  offset = 0.1, ylab = "number of fatalities")
+barplot(injuriestop10, names.arg=names(injuriestop10), cex.names=0.5, las=3, col = heat.colors(10), 
+        space=0.1,  offset = 0.1, ylab = "number of injuries" )
+title(main = 
+      "Ten most severe types of weather events \n in terms of human health impacts",
+      outer = TRUE)
+```
+
+```{r}
+##ploting the Ten most severe types of weather events \n in terms of economic loss
+par(mfrow = c(1,2 ), mar = c(7,4,2,0), oma = c(0,0,2,0))
+barplot(propdmgtop10, names.arg=names(propdmgtop10), cex.names=0.5, las=3, col = terrain.colors(10), 
+        space=0.1,  offset = 0.1, ylab = "property damage in US-dollar")
+barplot(cropdmgtop10, names.arg=names(cropdmgtop10), cex.names=0.5, las=3, col = grey.colors(10), 
+        space=0.1,  offset = 0.1, ylab = "crop damage in US-dollar" )
+title(main = "Ten most severe types of weather events \n in terms of economic loss",
+      outer = TRUE)
+```
+# Results and Conclusions
+
+### Answering Question 1
+As demonstrated by the Graphs, Tornados causes the greatest number of Fatalities and Injuries. 
+
+Specifically in FATALITIES, after Tornados, EXCESSIVE HEAT, FLASH FLOOD and HEAT are the next ones.
+
+Specifically in INJURIES, after tornados we have TSTM WIND, FLOOD and EXCESSIVE HEAT. 
+
+### Answering Question 2
+The impact on property and crop damage is different: 
+
+The largest damage on properties are caused by flood.
+
+But drought has the highest impact on crop.
+
+### Conclusions
+Based on evidences demonstrated previously, tornados, floods and droughts have priorities to minimize the impact in human and economic costs of Weather Events. Government and people have to be prepared for each type of events. For safety, it's important to population to know what to do during such events.
